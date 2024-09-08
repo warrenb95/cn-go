@@ -9,6 +9,12 @@ import (
 	"github.com/warrenb95/cn-go/internal/store"
 )
 
+type TransactionLogger interface {
+	WritePut(key, value string)
+	WriteDelete(key string)
+	Err() <-chan error
+}
+
 func putHandler(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	if key == "" {
