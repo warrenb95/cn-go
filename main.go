@@ -13,7 +13,13 @@ type TransactionLogger interface {
 	WritePut(key, value string)
 	WriteDelete(key string)
 	Err() <-chan error
+
+	ReadEvents() (<-chan store.Event, <-chan error)
+
+	Run()
 }
+
+var txLogger TransactionLogger
 
 func putHandler(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
@@ -34,6 +40,7 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save key: value", http.StatusInternalServerError)
 		return
 	}
+	txLogger.WritePut(key, string(body))
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -74,10 +81,17 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete key value", http.StatusInternalServerError)
 		return
 	}
+	txLogger.WriteDelete(key)
 }
 
 func main() {
 	mux := http.NewServeMux()
+
+	var err error
+	txLogger, err = store.NewFileTransactionLogger("tx_logs.log")
+	if err != nil {
+		log.Fatalf("tx logger: %v", err)
+	}
 
 	mux.HandleFunc("PUT /v1/{key}", putHandler)
 	mux.HandleFunc("GET /v1/{key}", getHandler)

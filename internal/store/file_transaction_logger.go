@@ -22,6 +22,10 @@ type FileTransactionLogger struct {
 	file            *os.File
 }
 
+func (l *FileTransactionLogger) Err() <-chan error {
+	return l.errors
+}
+
 type Event struct {
 	Sequence uint64
 	Type     EventType
@@ -40,7 +44,7 @@ func (l *FileTransactionLogger) WritePut(key string, value string) {
 func (l *FileTransactionLogger) WriteDelete(key string) {
 	l.events <- Event{
 		Key:  key,
-		Type: EventPut,
+		Type: EventDelete,
 	}
 }
 
@@ -50,9 +54,28 @@ func NewFileTransactionLogger(filename string) (*FileTransactionLogger, error) {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
-	return &FileTransactionLogger{
+	logger := &FileTransactionLogger{
 		file: file,
-	}, nil
+	}
+
+	eventsCh, errCh := logger.ReadEvents()
+	e, ok := Event{}, true
+	for ok && err == nil {
+		select {
+		case err, ok = <-errCh:
+		case e, ok = <-eventsCh:
+			switch e.Type {
+			case EventDelete:
+				err = Delete(e.Key)
+			case EventPut:
+				err = Put(e.Key, e.Value)
+			}
+		}
+	}
+
+	logger.Run()
+
+	return logger, nil
 }
 
 func (l *FileTransactionLogger) Run() {
@@ -65,7 +88,7 @@ func (l *FileTransactionLogger) Run() {
 	go func() {
 		for e := range eventCh {
 			l.currentSequence++
-			_, err := fmt.Fprintf(l.file, "%d\t%d\t%s\t%s", l.currentSequence, e.Type, e.Key, e.Value)
+			_, err := fmt.Fprintf(l.file, "%d\t%d\t%s\t%s\n", l.currentSequence, e.Type, e.Key, e.Value)
 			if err != nil {
 				errCh <- fmt.Errorf("writing event to file: %w", err)
 				return
@@ -83,8 +106,8 @@ func (l *FileTransactionLogger) ReadEvents() (<-chan Event, <-chan error) {
 		defer close(eventCh)
 		defer close(errCh)
 
-		var e Event
 		for fs.Scan() {
+			var e Event
 			line := fs.Text()
 			if _, err := fmt.Sscanf(line, "%d\t%d\t%s\t%s", &e.Sequence, &e.Type, &e.Key, &e.Value); err != nil {
 				errCh <- fmt.Errorf("scanning line into event: %w", err)
