@@ -15,6 +15,18 @@ const (
 	EventDelete
 )
 
+type Event struct {
+	Sequence uint64
+	Type     EventType
+	Key      string
+	Value    string
+}
+
+type Store interface {
+	Put(key string, value string) error
+	Delete(key string) error
+}
+
 type FileTransactionLogger struct {
 	events          chan<- Event
 	errors          <-chan error
@@ -22,15 +34,17 @@ type FileTransactionLogger struct {
 	file            *os.File
 }
 
-func (l *FileTransactionLogger) Err() <-chan error {
-	return l.errors
+func (l *FileTransactionLogger) Close() error {
+	err := l.file.Close()
+	if err != nil {
+		return fmt.Errorf("closing file tx log file: %w", err)
+	}
+
+	return nil
 }
 
-type Event struct {
-	Sequence uint64
-	Type     EventType
-	Key      string
-	Value    string
+func (l *FileTransactionLogger) Err() <-chan error {
+	return l.errors
 }
 
 func (l *FileTransactionLogger) WritePut(key string, value string) {
@@ -48,7 +62,7 @@ func (l *FileTransactionLogger) WriteDelete(key string) {
 	}
 }
 
-func NewFileTransactionLogger(filename string) (*FileTransactionLogger, error) {
+func NewFileTransactionLogger(filename string, store Store) (*FileTransactionLogger, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
@@ -66,9 +80,9 @@ func NewFileTransactionLogger(filename string) (*FileTransactionLogger, error) {
 		case e, ok = <-eventsCh:
 			switch e.Type {
 			case EventDelete:
-				err = Delete(e.Key)
+				err = store.Delete(e.Key)
 			case EventPut:
-				err = Put(e.Key, e.Value)
+				err = store.Put(e.Key, e.Value)
 			}
 		}
 	}

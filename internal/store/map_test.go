@@ -28,7 +28,9 @@ func TestPut(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			err := store.Put(test.key, test.value)
+
+			s := store.NewMapStore()
+			err := s.Put(test.key, test.value)
 			if test.errContains != "" {
 				require.Error(t, err, "put error")
 				assert.ErrorContains(t, err, test.errContains, "put error")
@@ -36,7 +38,7 @@ func TestPut(t *testing.T) {
 			}
 			require.NoError(t, err, "put error")
 
-			value, err := store.Get(test.key)
+			value, err := s.Get(test.key)
 			require.NoError(t, err, "getting the value")
 
 			assert.Equal(t, test.value, value, "put value")
@@ -71,13 +73,14 @@ func TestGet(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			s := store.NewMapStore()
 
 			if test.storedKey != "" {
-				err := store.Put(test.storedKey, test.storedValue)
+				err := s.Put(test.storedKey, test.storedValue)
 				require.NoError(t, err, "putting stored values")
 			}
 
-			got, err := store.Get(test.key)
+			got, err := s.Get(test.key)
 			if test.errContains != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, test.errContains)
@@ -114,17 +117,19 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
+			s := store.NewMapStore()
+
 			if test.storedKey != "" {
-				err := store.Put(test.storedKey, test.storedValue)
+				err := s.Put(test.storedKey, test.storedValue)
 				require.NoError(t, err, "putting stored values")
 			}
 
-			got, err := store.Get(test.key)
+			got, err := s.Get(test.key)
 			require.NoError(t, err, "checking value in store before delete")
 			require.NotEmpty(t, got, "get response")
 			require.Equal(t, test.storedValue, got, "stored value")
 
-			err = store.Delete(test.key)
+			err = s.Delete(test.key)
 			if test.errContains != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, test.errContains)
@@ -132,7 +137,7 @@ func TestDelete(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			_, err = store.Get(test.key)
+			_, err = s.Get(test.key)
 			require.Error(t, err, "get error after value delete")
 			assert.ErrorContains(t, err, store.ErrKeyNotFound.Error(), "get error after deleting value")
 		})

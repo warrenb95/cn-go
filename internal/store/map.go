@@ -6,31 +6,33 @@ import (
 	"sync"
 )
 
-type mapStore struct {
+type MapStore struct {
 	sync.RWMutex
 	m map[string]string
-}
-
-var ms = mapStore{
-	m: make(map[string]string),
 }
 
 var (
 	ErrKeyNotFound = errors.New("key not found")
 )
 
-func Put(key, value string) error {
-	ms.Lock()
-	defer ms.Unlock()
-	ms.m[key] = value
+func NewMapStore() *MapStore {
+	return &MapStore{
+		m: make(map[string]string),
+	}
+}
+
+func (s *MapStore) Put(key, value string) error {
+	s.Lock()
+	defer s.Unlock()
+	s.m[key] = value
 
 	return nil
 }
 
-func Get(key string) (string, error) {
-	ms.RLock()
-	defer ms.RUnlock()
-	v, ok := ms.m[key]
+func (s *MapStore) Get(key string) (string, error) {
+	s.RLock()
+	defer s.RUnlock()
+	v, ok := s.m[key]
 	if !ok {
 		return "", fmt.Errorf("getting from store: %w", ErrKeyNotFound)
 	}
@@ -38,10 +40,10 @@ func Get(key string) (string, error) {
 	return v, nil
 }
 
-func Delete(key string) error {
-	ms.Lock()
-	defer ms.Unlock()
-	delete(ms.m, key)
+func (s *MapStore) Delete(key string) error {
+	s.Lock()
+	defer s.Unlock()
+	delete(s.m, key)
 
 	return nil
 }
