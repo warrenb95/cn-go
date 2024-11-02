@@ -7,13 +7,11 @@ import (
 )
 
 type MapStore struct {
-	sync.RWMutex
 	m map[string]string
+	sync.RWMutex
 }
 
-var (
-	ErrKeyNotFound = errors.New("key not found")
-)
+var ErrKeyNotFound = errors.New("key not found")
 
 func NewMapStore() *MapStore {
 	return &MapStore{

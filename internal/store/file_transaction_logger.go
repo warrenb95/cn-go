@@ -16,10 +16,10 @@ const (
 )
 
 type Event struct {
-	Sequence uint64
-	Type     EventType
 	Key      string
 	Value    string
+	Type     EventType
+	Sequence uint64
 }
 
 type Store interface {
@@ -28,10 +28,10 @@ type Store interface {
 }
 
 type FileTransactionLogger struct {
+	file            *os.File
 	events          chan<- Event
 	errors          <-chan error
 	currentSequence uint64
-	file            *os.File
 }
 
 func (l *FileTransactionLogger) Close() error {
